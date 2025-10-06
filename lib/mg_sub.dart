@@ -14,12 +14,13 @@ final HashMap<String, Sub> _sub = HashMap(
 
 /// Base Sub Controller
 abstract class Sub<S> {
-  final String _id;
+  late final String _id;
   String get id => _id;
   late S _prevState;
   late final BehaviorSubject<S> _stateController;
 
-  Sub(S _state, this._id) {
+  Sub(S _state, [String? _idI]) {
+    _id = _idI ?? runtimeType.toString();
     _prevState = _state;
     _sub.putIfAbsent(_id, () => this);
     _stateController = BehaviorSubject<S>.seeded(_prevState);
@@ -29,7 +30,10 @@ abstract class Sub<S> {
   static SubObserver observer = const _DefaultSubObserver();
 
   /// Retrieve existing Sub controller or create via GetIt
-  static T of<T extends Sub>(String id) {
+  static T of<T extends Sub>([String? id]) {
+    if (id == null) {
+      id = T.toString();
+    }
     if (_sub.containsKey(id)) {
       return _sub[id] as T;
     } else {
