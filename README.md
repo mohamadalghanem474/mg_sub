@@ -17,6 +17,7 @@ Add to your `pubspec.yaml`:
 dependencies:
   mg_sub: latest
   mg_sub_lint: latest
+  get_it: latest
 ```
 
 ---
