@@ -1,26 +1,28 @@
 // lib/mg_sub.dart
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:rxdart/rxdart.dart';
 import 'dart:collection';
-
-part 'mg_sub.freezed.dart';
+export 'sub_state.dart';
 
 /// Global registry of all Sub controllers
-HashMap<String, Sub> _sub = HashMap(
+final HashMap<String, Sub> _sub = HashMap(
   equals: (name, otherName) => name == otherName,
 );
 
 /// Base Sub Controller
-abstract class Sub<TSuccess> {
-  String instanceName;
-  SubState<TSuccess> _prevState = const SubState.initial(); // previous state
+abstract class Sub<S> {
+  final String instanceName;
+  late S _prevState;
+  late final BehaviorSubject<S> _stateController;
 
-  Sub(this.instanceName) {
+  Sub(S state, this.instanceName) {
+    _prevState = state;
     _sub.putIfAbsent(instanceName, () => this);
+    _stateController = BehaviorSubject<S>.seeded(_prevState);
   }
 
+  /// Global observer for Sub events
   static SubObserver observer = const _DefaultSubObserver();
 
   /// Retrieve existing Sub controller or create via GetIt
@@ -36,40 +38,39 @@ abstract class Sub<TSuccess> {
 
   /// For testing: all controllers of a type
   static List<T> ofAll<T extends Sub>() => _sub.values.whereType<T>().toList();
-  static List<Sub> all() => _sub.values.toList();
-  static Map<String, Sub> map() => _sub;
 
-  final _stateController =
-      BehaviorSubject<SubState<TSuccess>>()..sink.add(const SubState.initial());
+  /// For testing: all controllers
+  static Map<String, Sub> all() => _sub;
 
-  Stream<SubState<TSuccess>> get stateStream => _stateController.stream;
+  /// Clear all controllers
+  static void clear() => _sub.clear();
 
-  /// Emit states
-  void emitInitial() => _addState(const SubState.initial());
-  void emitLoading() => _addState(const SubState.loading());
-  void emitSuccess(TSuccess data) => _addState(SubState.success(data));
-  void emitFailure(String error) => _addState(SubState.failure(error));
+  /// Stream of state updates
+  Stream<S> get stateStream => _stateController.stream;
 
-  /// Internal method to handle prevState and notify observer
-  void _addState(SubState<TSuccess> newState) {
+  /// Emit a new state
+  void emit(S state) => _addState(state);
+
+  /// Internal method to update state and notify observer
+  void _addState(S newState) {
     final oldState = _stateController.value;
     _prevState = oldState;
     _stateController.add(newState);
-    observer.onChange(this, _prevState, newState);
+    observer.onChange(this, oldState, newState);
   }
 
-  /// Get previous state
-  SubState<TSuccess> get prevState => _prevState;
+  /// Previous state
+  S get prevState => _prevState;
 
   /// Current state
-  SubState<TSuccess> get currentState => _stateController.value;
+  S get currentState => _stateController.value;
 
+  /// Whether the controller is closed
   bool get isClosed => _stateController.isClosed;
-  TSuccess? get subState => _stateController.value.dataOrNull;
 
   /// Dispose controller
   void dispose() {
-    _stateController.close();
+    if (!_stateController.isClosed) _stateController.close();
     _sub.remove(instanceName);
     observer.onClose(this);
   }
@@ -77,15 +78,15 @@ abstract class Sub<TSuccess> {
 
 /// Widget to listen and rebuild on Sub state changes
 class SubBuilder<T extends Sub<S>, S> extends StatefulWidget {
-  final Widget Function(BuildContext context, SubState<S> state) builder;
+  final Widget Function(BuildContext context, S state) builder;
   final String? instanceName;
-  final bool autoDispose;
+  final bool close;
 
   const SubBuilder({
     super.key,
     required this.builder,
     this.instanceName,
-    this.autoDispose = false,
+    this.close = false, // safer default for global state
   });
 
   @override
@@ -110,7 +111,7 @@ class _SubBuilderState<T extends Sub<S>, S> extends State<SubBuilder<T, S>> {
 
   @override
   void dispose() {
-    if (widget.autoDispose) {
+    if (widget.close) {
       controller.dispose();
     }
     super.dispose();
@@ -118,7 +119,7 @@ class _SubBuilderState<T extends Sub<S>, S> extends State<SubBuilder<T, S>> {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<SubState<S>>(
+    return StreamBuilder<S>(
       initialData: controller.currentState,
       stream: controller.stateStream.distinct(),
       builder: (context, snapshot) {
@@ -127,32 +128,6 @@ class _SubBuilderState<T extends Sub<S>, S> extends State<SubBuilder<T, S>> {
       },
     );
   }
-}
-
-/// Freezed states for Sub
-@freezed
-class SubState<TSuccess> with _$SubState<TSuccess> {
-  const SubState._();
-  const factory SubState.initial() = _SubInitial;
-  const factory SubState.loading() = _SubLoading;
-  const factory SubState.success(TSuccess data) = _SubSuccess;
-  const factory SubState.failure(String error) = _SubFailure;
-
-  bool get isInitial => this is _SubInitial;
-  bool get isLoading => this is _SubLoading;
-  bool get isSuccess => this is _SubSuccess;
-  bool get isFailure => this is _SubFailure;
-
-  TSuccess? get dataOrNull => whenOrNull(success: (data) => data);
-  String? get errorOrNull => whenOrNull(failure: (err) => err);
-
-  @override
-  String toString() => when(
-        success: (_) => 'Success',
-        loading: () => 'Loading',
-        failure: (_) => 'Failure',
-        initial: () => 'Initial',
-      );
 }
 
 /// Observer interface
@@ -165,7 +140,7 @@ abstract class SubObserver {
 
   @protected
   @mustCallSuper
-  void onChange(Sub<dynamic> sub, SubState<dynamic> prev, SubState<dynamic> next) {}
+  void onChange(Sub<dynamic> sub, dynamic prev, dynamic next) {}
 
   @protected
   @mustCallSuper

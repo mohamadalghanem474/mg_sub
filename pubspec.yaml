@@ -1,6 +1,6 @@
 name: mg_sub
 description: A lightweight reactive controller architecture with GetIt and RxDart.
-version: 1.0.5
+version: 1.1.0
 license: MIT
 homepage: https://github.com/mohamadalghanem474/mg_sub
 repository: https://github.com/mohamadalghanem474/mg_sub

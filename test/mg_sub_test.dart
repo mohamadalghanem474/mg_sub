@@ -1,81 +1,121 @@
+// test/mg_sub_test.dart
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 import 'package:mg_sub/mg_sub.dart';
 
-/// A mock controller that extends Sub
-class TestController extends Sub<String> {
-  TestController(super.instanceName);
+// Mock Observer
+class MockObserver extends SubObserver {
+  final _onCreate = <Sub>[];
+  final _onChange = <Map<String, dynamic>>[];
+  final _onClose = <Sub>[];
 
-  void simulateSuccess(String data) => emitSuccess(data);
-  void simulateFailure(String error) => emitFailure(error);
+  @override
+  void onCreate(Sub<dynamic> sub) {
+    _onCreate.add(sub);
+    super.onCreate(sub);
+  }
+
+  @override
+  void onChange(Sub<dynamic> sub, prev, next) {
+    _onChange.add({'sub': sub, 'prev': prev, 'next': next});
+    super.onChange(sub, prev, next);
+  }
+
+  @override
+  void onClose(Sub<dynamic> sub) {
+    _onClose.add(sub);
+    super.onClose(sub);
+  }
+
+  List<Sub> get created => _onCreate;
+  List<Map<String, dynamic>> get changed => _onChange;
+  List<Sub> get closed => _onClose;
+}
+
+// Simple Sub implementation for testing
+class CounterSub extends Sub<int> {
+  CounterSub(String name) : super(0, name);
+  void increment() => emit(currentState + 1);
 }
 
 void main() {
-  final sl = GetIt.instance;
-
   setUp(() {
-    sl.reset();
+    GetIt.I.reset();
+    Sub.clear();
   });
 
-  group('Sub', () {
-    test('emits correct states in order', () async {
-      final controller = TestController('test');
-      final states = <SubState<String>>[];
-
-      controller.stateStream.listen(states.add);
-
-      controller.emitInitial();
-      controller.emitLoading();
-      controller.emitSuccess('done');
-      controller.emitFailure('error');
-
-      await Future.delayed(const Duration(milliseconds: 10));
-
-      expect(states.length, equals(5)); // includes initial state
-      expect(states.last.isFailure, isTrue);
-      expect(states.last.errorOrNull, equals('error'));
+  group('Sub core functionality', () {
+    test('create and retrieve Sub instance', () {
+      final counter = CounterSub('counter1');
+      expect(Sub.of<CounterSub>('counter1'), counter);
+      expect(Sub.ofAll<CounterSub>().length, 1);
     });
 
-    test('controller is stored and retrieved from global map', () {
-      final controllerA = TestController('myKey');
-      final controllerB = Sub.of<TestController>('myKey');
-
-      expect(controllerA, equals(controllerB));
-      expect(Sub.map().containsKey('myKey'), isTrue);
+    test('emit updates and track previous/current state', () {
+      final counter = CounterSub('counter2');
+      expect(counter.currentState, 0);
+      counter.increment();
+      expect(counter.currentState, 1);
+      expect(counter.prevState, 0);
     });
 
-    test('controller.dispose() removes from registry', () {
-      final controller = TestController('toDispose');
-      expect(Sub.map().containsKey('toDispose'), isTrue);
+    test('observer callbacks are triggered', () {
+      final observer = MockObserver();
+      Sub.observer = observer;
 
-      controller.dispose();
-      expect(Sub.map().containsKey('toDispose'), isFalse);
+      final counter = CounterSub('counter3');
+      expect(observer.created.contains(counter), true);
+
+      counter.increment();
+      expect(observer.changed.any((c) => c['sub'] == counter && c['prev'] == 0 && c['next'] == 1), true);
+
+      counter.dispose();
+      expect(observer.closed.contains(counter), true);
     });
 
-    test('of() creates new controller via GetIt when not exists', () {
-      sl.registerFactoryParam<TestController, String, void>(
-        (name, _) => TestController(name),
+    test('dispose removes instance from registry', () {
+      final counter = CounterSub('counter4');
+      expect(Sub.all().containsKey('counter4'), true);
+      counter.dispose();
+      expect(Sub.all().containsKey('counter4'), false);
+    });
+  });
+
+  group('SubBuilder widget', () {
+    testWidgets('rebuilds on state changes', (tester) async {
+      final counter = CounterSub('counterWidget');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SubBuilder<CounterSub, int>(
+            instanceName: 'counterWidget',
+            builder: (context, state) => Text('Value: $state', textDirection: TextDirection.ltr),
+          ),
+        ),
       );
 
-      final controller = Sub.of<TestController>('created');
-      expect(controller.instanceName, equals('created'));
-      expect(Sub.map().containsKey('created'), isTrue);
+      expect(find.text('Value: 0'), findsOneWidget);
+
+      counter.increment();
+      await tester.pump();
+      expect(find.text('Value: 1'), findsOneWidget);
     });
-  });
 
-  group('SubState', () {
-    test('state properties work correctly', () {
-      SubState<String> state1 = SubState<String>.initial();
-      SubState<String> state2 = SubState<String>.loading();
-      SubState<String> state3 = SubState<String>.success('hi');
-      SubState<String> state4 = SubState<String>.failure('error');
+    testWidgets('disposes controller if close is true', (tester) async {
+      final counter = CounterSub('counterDispose');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SubBuilder<CounterSub, int>(
+            instanceName: 'counterDispose',
+            builder: (context, state) => Container(),
+          ),
+        ),
+      );
 
-      expect(state1.isInitial, isTrue);
-      expect(state2.isLoading, isTrue);
-      expect(state3.isSuccess, isTrue);
-      expect(state4.isFailure, isTrue);
-      expect(state3.dataOrNull, equals('hi'));
-      expect(state4.errorOrNull, equals('error'));
+      await tester.pumpWidget(Container());
+      expect(counter.isClosed, true);
+      expect(Sub.all().containsKey('counterDispose'), false);
     });
   });
 }

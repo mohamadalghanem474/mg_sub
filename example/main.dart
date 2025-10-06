@@ -1,163 +1,79 @@
-import 'dart:developer';
-
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:mg_sub/mg_sub.dart';
 
-/// ------------------------------------------------
-/// Example Controller
-/// ------------------------------------------------
-class DataController extends Sub<String> {
-  DataController(super.name);
+/// Example Sub controller: Counter
+class CounterSub extends Sub<int> {
+  CounterSub(String name) : super(0, name);
 
-  void loadData() async {
-    emitLoading();
-    await Future.delayed(const Duration(seconds: 2));
-    emitSuccess("Hello from controller #$instanceName");
-  }
-
-  void throwError() {
-    emitFailure("Something went wrong!");
-  }
+  void increment() => emit(currentState + 1);
+  void decrement() => emit(currentState - 1);
 }
 
-/// ------------------------------------------------
-/// Example App
-/// ------------------------------------------------
 void main() {
-  GetIt.I.registerFactoryParam<DataController, String, void>((name, _) => DataController(name));
-  Sub.observer = const MySubObserver();
+  // Register Sub controllers with GetIt
+  GetIt.I.registerFactoryParam<CounterSub, String, void>(
+    (name, _) => CounterSub(name),
+  );
+
   runApp(const MyApp());
 }
 
-/// ------------------------------------------------
-/// App with two pages and pushAndRemoveUntil
-/// ------------------------------------------------
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Sub Example',
-      home: const FirstPage(),
-    );
+    return MaterialApp(title: 'Sub Example', home: const CounterPage());
   }
 }
 
-class FirstPage extends StatelessWidget {
-  const FirstPage({super.key});
+class CounterPage extends StatelessWidget {
+  const CounterPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    /// ⚠️ Don't access `Sub.of<DataController>('1')` inside build()
-    /// because if the controller was disposed (e.g., autoDispose = true),
-    /// `Sub.of()` will create a NEW instance — not the last one.
-    /// Use `Sub.of<DataController>('1')` inside callbacks. for get latest instance
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Page 1')),
+      appBar: AppBar(title: const Text('Sub Example')),
       body: Center(
-        child: SubBuilder<DataController, String>(
-          instanceName: "1",
-          autoDispose: true,
+        child: SubBuilder<CounterSub, int>(
+          instanceName: 'counter1',
           builder: (context, state) {
-            return state.when(
-              initial: () => ElevatedButton(
-                onPressed: () {
-                  /// Access `Sub.of<DataController>('1')` inside callbacks
-                  /// to get latest instance
-                  Sub.of<DataController>('1').loadData();
-                },
-                child: const Text("Load Data"),
-              ),
-              loading: () => const CircularProgressIndicator(),
-              success: (data) => Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(data),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const SecondPage(),
-                        ),
-                        (route) => false,
-                      );
-                    },
-                    child: const Text("Go to Page 2"),
-                  ),
-                ],
-              ),
-              failure: (error) => Text(error),
+            return Text(
+              'Counter: $state',
+              style: const TextStyle(fontSize: 32),
             );
           },
         ),
       ),
-    );
-  }
-}
-
-class SecondPage extends StatelessWidget {
-  const SecondPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    /// ⚠️ Don't access `Sub.of<DataController>('1')` inside build()
-    /// because if the controller was disposed (e.g., autoDispose = true),
-    /// `Sub.of()` will create a NEW instance — not the last one.
-    /// Use `Sub.of<DataController>('1')` inside callbacks. for get latest instance
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Page 2')),
-      body: Center(
-        child: SubBuilder<DataController, String>(
-          instanceName: "1",
-          autoDispose: false,
-          builder: (context, state) {
-            return state.when(
-              initial: () => const Text("Initial"),
-              loading: () => const CircularProgressIndicator(),
-              success: (data) => Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text("From Page 2: $data"),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    /// Access `Sub.of<DataController>('1')` inside callbacks
-                    /// to get latest instance
-                    onPressed: Sub.of<DataController>('1').loadData,
-                    child: const Text("Reload"),
-                  ),
-                ],
-              ),
-              failure: (error) => Text(error),
-            );
-          },
-        ),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            heroTag: 'inc',
+            onPressed: () => Sub.of<CounterSub>('counter1').increment(),
+            child: const Icon(Icons.add),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton(
+            heroTag: 'dec',
+            onPressed: () => Sub.of<CounterSub>('counter1').decrement(),
+            child: const Icon(Icons.remove),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton(
+            heroTag: 'clear',
+            onPressed: () {
+              Sub.clear(); // Clears all controllers
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('All Sub controllers cleared!')),
+              );
+            },
+            child: const Icon(Icons.clear_all),
+          ),
+        ],
       ),
     );
-  }
-}
-
-class MySubObserver extends SubObserver {
-  const MySubObserver();
-  @override
-  void onCreate(Sub<dynamic> sub) {
-    log(name: "SubObserver", "CREATED ${sub.runtimeType} ${sub.instanceName} 📦 🆕");
-    super.onCreate(sub);
-  }
-
-  @override
-  void onClose(Sub<dynamic> sub) {
-    log(name: "SubObserver", "CLOSED ${sub.runtimeType} ${sub.instanceName} 📦 💀");
-    super.onClose(sub);
-  }
-
-  @override
-  void onChange(Sub<dynamic> sub, SubState<dynamic> prev, SubState<dynamic> next) {
-    log(name: "SubObserver", "CHANGE ${sub.runtimeType} ${sub.instanceName} 📝 $prev ➡️ $next");
-    super.onChange(sub, prev, next);
   }
 }
