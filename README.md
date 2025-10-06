@@ -1,15 +1,11 @@
-# Global State Manager
+# Global State Manager Depending on `get_it`
 
-`mg_sub` is a **lightweight state management helper** for Flutter, inspired by BLoC and Riverpod, built on:
-
-* `rxdart` (Streams)
-* `get_it` (Dependency Injection)
+`mg_sub` is a **lightweight state management helper** for Flutter, inspired by BLoC and Riverpod
 
 It allows you to:
-
 * Create reactive state controllers.
 * Observe lifecycle events (`onCreate`, `onChange`, `onClose`).
-* Access and reuse controllers globally by `instanceName`.
+* Access and reuse controllers globally by `id` Without BuildContext.
 
 ---
 
@@ -30,154 +26,84 @@ dependencies:
 ### `lib/main.dart`
 
 ```dart
-import 'dart:developer';
-
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:mg_sub/mg_sub.dart';
 
-/// ------------------------------------------------
-/// Example Controller
-/// ------------------------------------------------
-class DataController extends Sub<String> {
-  DataController(super.instanceName);
+/// Example Sub controller: Counter
+class CounterSub extends Sub<int> {
+  CounterSub(String name) : super(0, name);
 
-  void loadData() async {
-    emit("Loading...");
-    await Future.delayed(const Duration(seconds: 2));
-    emit("Hello from controller #$instanceName");
-  }
-
-  void throwError() {
-    emit("Something went wrong!");
-  }
+  void increment() => emit(currentState + 1);
+  void decrement() => emit(currentState - 1);
 }
 
-/// ------------------------------------------------
-/// Example App
-/// ------------------------------------------------
 void main() {
-  GetIt.I.registerFactoryParam<DataController, String, void>(
-    (name, _) => DataController(name),
+  // Register Sub controllers with GetIt
+  GetIt.I.registerFactoryParam<CounterSub, String, void>(
+    (name, _) => CounterSub(name),
   );
-  Sub.observer = const MySubObserver();
+
   runApp(const MyApp());
 }
 
-/// ------------------------------------------------
-/// App with two pages
-/// ------------------------------------------------
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Sub Example',
-      home: const FirstPage(),
-    );
+    return MaterialApp(title: 'Sub Example', home: const CounterPage());
   }
 }
 
-class FirstPage extends StatelessWidget {
-  const FirstPage({super.key});
+class CounterPage extends StatelessWidget {
+  const CounterPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Page 1')),
+      appBar: AppBar(title: const Text('Sub Example')),
       body: Center(
-        child: SubBuilder<DataController, String>(
-          instanceName: "1",
-          close: false, // keep controller alive when leaving page
+        child: SubBuilder<CounterSub, int>(
+          id: 'counter1',
           builder: (context, state) {
-            if (state == "Loading...") {
-              return const CircularProgressIndicator();
-            } else {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(state),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () {
-                      Sub.of<DataController>('1').loadData();
-                    },
-                    child: const Text("Load Data"),
-                  ),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const SecondPage(),
-                        ),
-                      );
-                    },
-                    child: const Text("Go to Page 2"),
-                  ),
-                ],
-              );
-            }
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class SecondPage extends StatelessWidget {
-  const SecondPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Page 2')),
-      body: Center(
-        child: SubBuilder<DataController, String>(
-          instanceName: "1",
-          close: false,
-          builder: (context, state) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text("From Page 2: $state"),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: Sub.of<DataController>('1').loadData,
-                  child: const Text("Reload"),
-                ),
-              ],
+            return Text(
+              'Counter: $state',
+              style: const TextStyle(fontSize: 32),
             );
           },
         ),
       ),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            heroTag: 'inc',
+            onPressed: () => Sub.of<CounterSub>('counter1').increment(),
+            child: const Icon(Icons.add),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton(
+            heroTag: 'dec',
+            onPressed: () => Sub.of<CounterSub>('counter1').decrement(),
+            child: const Icon(Icons.remove),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton(
+            heroTag: 'clear',
+            onPressed: () {
+              Sub.clear(); // Clears all controllers
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('All Sub controllers cleared!')),
+              );
+            },
+            child: const Icon(Icons.clear_all),
+          ),
+        ],
+      ),
     );
   }
 }
 
-/// ------------------------------------------------
-/// Custom observer for logging
-/// ------------------------------------------------
-class MySubObserver extends SubObserver {
-  const MySubObserver();
-
-  @override
-  void onCreate(Sub<dynamic> sub) {
-    log(name: "SubObserver", "CREATED ${sub.runtimeType} ${sub.instanceName} 📦 🆕");
-    super.onCreate(sub);
-  }
-
-  @override
-  void onClose(Sub<dynamic> sub) {
-    log(name: "SubObserver", "CLOSED ${sub.runtimeType} ${sub.instanceName} 📦 💀");
-    super.onClose(sub);
-  }
-
-  @override
-  void onChange(Sub<dynamic> sub, dynamic prev, dynamic next) {
-    log(name: "SubObserver", "CHANGE ${sub.runtimeType} ${sub.instanceName} 📝 $prev ➡️ $next");
-    super.onChange(sub, prev, next);
-  }
-}
 ```

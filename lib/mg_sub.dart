@@ -1,9 +1,11 @@
 // lib/mg_sub.dart
 import 'package:flutter/material.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rxdart/rxdart.dart';
 import 'dart:collection';
-export 'sub_state.dart';
+
+part 'mg_sub.freezed.dart';
 
 /// Global registry of all Sub controllers
 final HashMap<String, Sub> _sub = HashMap(
@@ -12,13 +14,14 @@ final HashMap<String, Sub> _sub = HashMap(
 
 /// Base Sub Controller
 abstract class Sub<S> {
-  final String id;
+  final String _id;
+  String get id => _id;
   late S _prevState;
   late final BehaviorSubject<S> _stateController;
 
-  Sub(S state, this.id) {
-    _prevState = state;
-    _sub.putIfAbsent(id, () => this);
+  Sub(S _state, this._id) {
+    _prevState = _state;
+    _sub.putIfAbsent(_id, () => this);
     _stateController = BehaviorSubject<S>.seeded(_prevState);
   }
 
@@ -71,7 +74,7 @@ abstract class Sub<S> {
   /// Dispose controller
   void dispose() {
     if (!_stateController.isClosed) _stateController.close();
-    _sub.remove(id);
+    _sub.remove(_id);
     observer.onClose(this);
   }
 }
@@ -150,4 +153,29 @@ abstract class SubObserver {
 /// Default no-op observer
 class _DefaultSubObserver extends SubObserver {
   const _DefaultSubObserver();
+}
+
+@freezed
+class SubState<TSuccess> with _$SubState<TSuccess> {
+  const SubState._();
+  const factory SubState.initial() = _SubInitial;
+  const factory SubState.loading() = _SubLoading;
+  const factory SubState.success(TSuccess data) = _SubSuccess;
+  const factory SubState.failure(String error) = _SubFailure;
+
+  bool get isInitial => this is _SubInitial;
+  bool get isLoading => this is _SubLoading;
+  bool get isSuccess => this is _SubSuccess;
+  bool get isFailure => this is _SubFailure;
+
+  TSuccess? get dataOrNull => whenOrNull(success: (data) => data);
+  String? get errorOrNull => whenOrNull(failure: (err) => err);
+
+  @override
+  String toString() => when(
+    success: (_) => 'Success',
+    loading: () => 'Loading',
+    failure: (_) => 'Failure',
+    initial: () => 'Initial',
+  );
 }
