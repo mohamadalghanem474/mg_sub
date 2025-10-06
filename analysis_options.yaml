@@ -1,5 +1,0 @@
-analyzer:
-  plugins:
-    - custom_lint
-  exclude:
-    - "test/mg_sub_test.dart"

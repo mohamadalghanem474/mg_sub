@@ -13,6 +13,7 @@
 ## 1.0.3
 
 * ReadMe update
-## 1.0.3
 
-* depend on mg_sub_lint plugin
+## 1.0.5
+
+* update ReadMe
