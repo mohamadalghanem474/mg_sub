@@ -38,7 +38,7 @@ class CounterPage extends StatelessWidget {
       appBar: AppBar(title: const Text('Sub Example')),
       body: Center(
         child: SubBuilder<CounterSub, int>(
-          instanceName: 'counter1',
+          id: 'counter1',
           builder: (context, state) {
             return Text(
               'Counter: $state',

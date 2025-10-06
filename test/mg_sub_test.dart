@@ -89,7 +89,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: SubBuilder<CounterSub, int>(
-            instanceName: 'counterWidget',
+            id: 'counterWidget',
             builder: (context, state) => Text('Value: $state', textDirection: TextDirection.ltr),
           ),
         ),
@@ -107,7 +107,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: SubBuilder<CounterSub, int>(
-            instanceName: 'counterDispose',
+            id: 'counterDispose',
             builder: (context, state) => Container(),
           ),
         ),

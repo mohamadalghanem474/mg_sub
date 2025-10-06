@@ -12,13 +12,13 @@ final HashMap<String, Sub> _sub = HashMap(
 
 /// Base Sub Controller
 abstract class Sub<S> {
-  final String instanceName;
+  final String id;
   late S _prevState;
   late final BehaviorSubject<S> _stateController;
 
-  Sub(S state, this.instanceName) {
+  Sub(S state, this.id) {
     _prevState = state;
-    _sub.putIfAbsent(instanceName, () => this);
+    _sub.putIfAbsent(id, () => this);
     _stateController = BehaviorSubject<S>.seeded(_prevState);
   }
 
@@ -26,11 +26,11 @@ abstract class Sub<S> {
   static SubObserver observer = const _DefaultSubObserver();
 
   /// Retrieve existing Sub controller or create via GetIt
-  static T of<T extends Sub>(String instanceName) {
-    if (_sub.containsKey(instanceName)) {
-      return _sub[instanceName] as T;
+  static T of<T extends Sub>(String id) {
+    if (_sub.containsKey(id)) {
+      return _sub[id] as T;
     } else {
-      final controller = GetIt.I<T>(param1: instanceName);
+      final controller = GetIt.I<T>(param1: id);
       observer.onCreate(controller);
       return controller;
     }
@@ -71,7 +71,7 @@ abstract class Sub<S> {
   /// Dispose controller
   void dispose() {
     if (!_stateController.isClosed) _stateController.close();
-    _sub.remove(instanceName);
+    _sub.remove(id);
     observer.onClose(this);
   }
 }
@@ -79,14 +79,14 @@ abstract class Sub<S> {
 /// Widget to listen and rebuild on Sub state changes
 class SubBuilder<T extends Sub<S>, S> extends StatefulWidget {
   final Widget Function(BuildContext context, S state) builder;
-  final String? instanceName;
+  final String? id;
   final bool close;
 
   const SubBuilder({
     super.key,
     required this.builder,
-    this.instanceName,
-    this.close = false, // safer default for global state
+    this.id,
+    this.close = true, // dispose controller when leaving page
   });
 
   @override
@@ -99,7 +99,7 @@ class _SubBuilderState<T extends Sub<S>, S> extends State<SubBuilder<T, S>> {
   @override
   void initState() {
     super.initState();
-    final name = widget.instanceName ?? T.toString();
+    final name = widget.id ?? T.toString();
 
     if (_sub.containsKey(name)) {
       controller = _sub[name] as T;
