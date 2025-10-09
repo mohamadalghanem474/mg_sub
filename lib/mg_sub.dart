@@ -67,10 +67,10 @@ abstract class Sub<S> {
   }
 
   /// Previous state
-  S get prevState => _prevState;
+  S get prev => _prevState;
 
   /// Current state
-  S get currentState => _stateController.value;
+  S get state => _stateController.value;
 
   /// Whether the controller is closed
   bool get isClosed => _stateController.isClosed;
@@ -127,7 +127,7 @@ class _SubBuilderState<T extends Sub<S>, S> extends State<SubBuilder<T, S>> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<S>(
-      initialData: controller.currentState,
+      initialData: controller.state,
       stream: controller.stateStream.distinct(),
       builder: (context, snapshot) {
         final state = snapshot.data!;

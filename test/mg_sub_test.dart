@@ -36,7 +36,7 @@ class MockObserver extends SubObserver {
 // Simple Sub implementation for testing
 class CounterSub extends Sub<int> {
   CounterSub(String name) : super(0, name);
-  void increment() => emit(currentState + 1);
+  void increment() => emit(state + 1);
 }
 
 void main() {
@@ -54,10 +54,10 @@ void main() {
 
     test('emit updates and track previous/current state', () {
       final counter = CounterSub('counter2');
-      expect(counter.currentState, 0);
+      expect(counter.state, 0);
       counter.increment();
-      expect(counter.currentState, 1);
-      expect(counter.prevState, 0);
+      expect(counter.state, 1);
+      expect(counter.prev, 0);
     });
 
     test('observer callbacks are triggered', () {
@@ -68,7 +68,12 @@ void main() {
       expect(observer.created.contains(counter), true);
 
       counter.increment();
-      expect(observer.changed.any((c) => c['sub'] == counter && c['prev'] == 0 && c['next'] == 1), true);
+      expect(
+        observer.changed.any(
+          (c) => c['sub'] == counter && c['prev'] == 0 && c['next'] == 1,
+        ),
+        true,
+      );
 
       counter.dispose();
       expect(observer.closed.contains(counter), true);
@@ -90,7 +95,8 @@ void main() {
         MaterialApp(
           home: SubBuilder<CounterSub, int>(
             id: 'counterWidget',
-            builder: (context, state) => Text('Value: $state', textDirection: TextDirection.ltr),
+            builder: (context, state) =>
+                Text('Value: $state', textDirection: TextDirection.ltr),
           ),
         ),
       );
