@@ -36,8 +36,8 @@ import 'package:mg_sub/mg_sub.dart';
 class CounterSub extends Sub<int> {
   CounterSub(String name) : super(0, name);
 
-  void increment() => emit(currentState + 1);
-  void decrement() => emit(currentState - 1);
+  void increment() => emit(state + 1);
+  void decrement() => emit(state - 1);
 }
 
 void main() {
