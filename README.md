@@ -35,7 +35,8 @@ import 'package:mg_sub/mg_sub.dart';
 /// Example Sub controller: Counter
 class CounterSub extends Sub<int> {
   CounterSub(String name) : super(0, name);
-
+  
+  /// Increment the counter if this not closed
   void increment() => emit(state + 1);
   void decrement() => emit(state - 1);
 }

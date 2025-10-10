@@ -55,15 +55,17 @@ abstract class Sub<S> {
   /// Stream of state updates
   Stream<S> get stream => _stateController.stream;
 
-  /// Emit a new state
+  /// Emit a new state if not closed
   void emit(S state) => _addState(state);
 
   /// Internal method to update state and notify observer
   void _addState(S newState) {
-    final oldState = _stateController.value;
-    _prevState = oldState;
-    if (!isClosed) _stateController.add(newState);
-    observer.onChange(this, oldState, newState);
+    if (!isClosed) {
+      final oldState = _stateController.value;
+      _prevState = oldState;
+      _stateController.add(newState);
+      observer.onChange(this, oldState, newState);
+    }
   }
 
   /// Previous state
@@ -77,9 +79,11 @@ abstract class Sub<S> {
 
   /// Dispose controller
   void dispose() {
-    if (!_stateController.isClosed) _stateController.close();
-    _sub.remove(_id);
-    observer.onClose(this);
+    if (!_stateController.isClosed) {
+      _sub.remove(_id);
+      _stateController.close();
+      observer.onClose(this);
+    }
   }
 }
 
