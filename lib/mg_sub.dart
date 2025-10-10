@@ -53,7 +53,7 @@ abstract class Sub<S> {
   static void clear() => _sub.clear();
 
   /// Stream of state updates
-  Stream<S> get stateStream => _stateController.stream;
+  Stream<S> get stream => _stateController.stream;
 
   /// Emit a new state
   void emit(S state) => _addState(state);
@@ -62,7 +62,7 @@ abstract class Sub<S> {
   void _addState(S newState) {
     final oldState = _stateController.value;
     _prevState = oldState;
-    _stateController.add(newState);
+    if (!isClosed) _stateController.add(newState);
     observer.onChange(this, oldState, newState);
   }
 
@@ -128,7 +128,7 @@ class _SubBuilderState<T extends Sub<S>, S> extends State<SubBuilder<T, S>> {
   Widget build(BuildContext context) {
     return StreamBuilder<S>(
       initialData: controller.state,
-      stream: controller.stateStream.distinct(),
+      stream: controller.stream.distinct(),
       builder: (context, snapshot) {
         final state = snapshot.data!;
         return widget.builder(context, state);
